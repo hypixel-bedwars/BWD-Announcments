@@ -1,14 +1,7 @@
 import { configDotenv } from "dotenv";
 import AppConfig from "./models/config.model.js";
 
-export function initAppConfig(): AppConfig {
-  configDotenv();
-
-  return {
-    discordToken: getEnv("DISCORD_TOKEN"),
-    discordGuildId: getEnv("DISCORD_GUILD_ID")
-  };
-}
+configDotenv();
 
 function getEnv(name: string): string {
   const value = process.env[name];
@@ -19,4 +12,8 @@ function getEnv(name: string): string {
 
   return value;
 }
-  
+
+export const config: AppConfig = {
+  discordToken: getEnv("DISCORD_TOKEN"),
+  discordGuildId: getEnv("DISCORD_GUILD_ID")
+} as const;

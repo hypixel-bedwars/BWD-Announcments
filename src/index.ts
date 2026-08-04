@@ -1,7 +1,5 @@
 import { Client, GatewayIntentBits, Events } from "discord.js";
-import { initAppConfig } from "./config.js";
-
-const AppConfig = initAppConfig()
+import { config } from "./config.js";
 
 const client = new Client({
   intents: [
@@ -17,4 +15,4 @@ client.on(Events.Error, error => {
   console.error(error);
 });
 
-client.login(AppConfig.discordToken);
+client.login(config.discordToken);
