@@ -7,10 +7,11 @@ import type { Event } from "../models/types/event.js";
 export async function registerEvents(client: Client) {
   const eventsDir = join(import.meta.dirname, "..", "events");
 
-  const files = await readdir(eventsDir);
+  const files = (await readdir(eventsDir))
+    .filter(file => file.endsWith(".ts") || file.endsWith(".js"))
+    .filter(file => !file.endsWith(".d.ts"));
 
   for (const file of files) {
-    if (!file.endsWith(".js")) continue;
 
     const path = pathToFileURL(join(eventsDir, file)).href;
 
