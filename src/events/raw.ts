@@ -14,6 +14,9 @@ async function tagExecute(client: Client, user: APIUser) {
 
     // Give member the tag role
     member.roles.add(config.discordTagRoleId);
+
+    // Make a announcmet about the user
+    // TODO
   }
 }
 
