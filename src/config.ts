@@ -15,5 +15,6 @@ function getEnv(name: string): string {
 
 export const config: AppConfig = {
   discordToken: getEnv("DISCORD_TOKEN"),
-  discordGuildId: getEnv("DISCORD_GUILD_ID")
+  discordGuildId: getEnv("DISCORD_GUILD_ID"),
+  discordTagRoleId: getEnv("DISCORD_TAG_ROLE_ID"),
 } as const;
