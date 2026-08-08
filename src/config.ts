@@ -17,5 +17,6 @@ export const config: AppConfig = {
   discordToken: getEnv("DISCORD_TOKEN"),
   discordGuildId: getEnv("DISCORD_GUILD_ID"),
   discordTagRoleId: getEnv("DISCORD_TAG_ROLE_ID"),
+  discordBoostRoleId: getEnv("DISCORD_BOOST_ROLE_ID"),
   discordAnnouncmentChannelId: getEnv("DISCORD_ANNOUNCMENT_CHANNEL_ID")
 } as const;

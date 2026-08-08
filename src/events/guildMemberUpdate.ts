@@ -1,10 +1,10 @@
-import { Client, Events, GuildMember, PartialGuildMember } from "discord.js";
+import { Client, EmbedBuilder, Events, GuildMember, PartialGuildMember, TextChannel } from "discord.js";
 import { Event } from "../models/types/event.js";
 import { config } from "../config.js";
 
 export default {
   name: Events.GuildMemberUpdate,
-  execute(
+  async execute(
     client: Client,
     oldMember: GuildMember | PartialGuildMember,
     newMember: GuildMember
@@ -15,13 +15,38 @@ export default {
     const isBoosting = newMember.premiumSince != null;
 
     if (!wasBoosting && isBoosting) {
-      console.log(`${newMember.user.tag} started boosting the server!`);
-      // handle "started boosting" logic here
-      // TODO
+      // Since the members are automatically given a role
+      // All the bot will need to do is announce the boost
+      // Since the members are automatically given a role
+      const channel = newMember.guild.channels.cache.get(
+        config.discordAnnouncmentChannelId
+      ) as TextChannel | undefined;
+      if (!channel) return;
+
+      const embed = new EmbedBuilder()
+        .setColor(0xf47fff)
+        .setAuthor({ name: "Server Boosted" })
+        .setDescription(
+          `Thank you, ${newMember} — you've boosted the server!\n\n` +
+            `> **Boost Count**\n` +
+            `> This is boost #${newMember.guild.premiumSubscriptionCount ?? "?"} for the server\n` +
+            `>\n` +
+            `**Exclusive Perks**\n` +
+            `> • You get the <@&${config.discordBoostRoleId}> role\n` +
+            `> • Access to woll colors\n` +
+            `> • 4x the entries when entering giveaways`,
+        )
+        .setThumbnail(newMember.displayAvatarURL())
+        .setFooter({
+          text: "Thank you for supporting the server.",
+        })
+        .setTimestamp();
+
+      await channel.send({ embeds: [embed] });
     } else if (wasBoosting && !isBoosting) {
-      console.log(`${newMember.user.tag} stopped boosting the server.`);
       // handle "stopped boosting" logic here
-      // TODO
+      // no logic for now tho
+      // left it like this for future use
     }
   },
 } satisfies Event<"guildMemberUpdate">;
