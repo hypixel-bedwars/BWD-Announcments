@@ -1,4 +1,4 @@
-import { APIUser, Client, Events } from "discord.js";
+import { APIUser, Client, EmbedBuilder, Events } from "discord.js";
 import type { Event } from "../models/types/event.js";
 import { config } from "../config.js";
 
@@ -11,12 +11,35 @@ async function tagExecute(client: Client, user: APIUser) {
   ) {
     const guild = await client.guilds.fetch(config.discordGuildId);
     const member = await guild.members.fetch(user.id);
-
+    const announcmentChannel = await guild.channels.fetch(
+      config.discordAnnouncmentChannelId,
+    );
     // Give member the tag role
     member.roles.add(config.discordTagRoleId);
 
-    // Make a announcmet about the user
-    // TODO
+    const embed = new EmbedBuilder()
+      .setColor(0x2b2d31)
+      .setTitle("Server Tag Equipped")
+      .setDescription(
+        `### Welcome, ${member}\n\n` +
+          `You've equipped our server tag and have been given an exclusive role.\n\n` +
+          `> **Role Unlocked**\n` +
+          `> <@&${config.discordTagRoleId}>\n\n` +
+          `### Exclusive Perks\n` +
+          `• +2 Giveaway entires\n` +
+          `• Streaming perms\n`
+      )
+      .setThumbnail(member.displayAvatarURL())
+      .setFooter({
+        text: "Thank you for supporting the server.",
+      })
+      .setTimestamp();
+
+    if (!announcmentChannel?.isTextBased()) return;
+
+    await announcmentChannel.send({
+      embeds: [embed],
+    });
   }
 }
 
@@ -34,7 +57,10 @@ export default {
 
       tagExecute(client, user);
 
-      console.log(`${user.username} primary_guild changed:`, user.primary_guild);
+      console.log(
+        `${user.username} primary_guild changed:`,
+        user.primary_guild,
+      );
     }
   },
 } satisfies Event<"raw">;
