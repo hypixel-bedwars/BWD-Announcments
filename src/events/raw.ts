@@ -23,15 +23,15 @@ async function tagExecute(client: Client, user: APIUser) {
       .setDescription(
         `### Welcome, ${member}\n\n` +
           `You've equipped our server tag and have been given an exclusive role.\n\n` +
-          `> **Role Unlocked**\n` +
-          `> <@&${config.discordTagRoleId}>\n\n` +
-          `### Exclusive Perks\n` +
-          `• +2 Giveaway entires\n` +
-          `• Streaming perms\n`
+          `> ### **Role Unlocked**\n` +
+          `> • <@&${config.discordTagRoleId}>\n` +
+          `> ### Exclusive Perks\n` +
+          `> • +2 Giveaway entires\n` +
+          `> • Streaming perms\n`
       )
       .setThumbnail(member.displayAvatarURL())
       .setFooter({
-        text: "Thank you for supporting the server.",
+        text: "Thank you for supporting the server",
       })
       .setTimestamp();
 
