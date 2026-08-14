@@ -30,7 +30,7 @@ export default {
           `Thank you, ${newMember} — you've boosted the server!\n\n` +
             `> **Boost Count**\n` +
             `> This is boost #${newMember.guild.premiumSubscriptionCount ?? "?"} for the server\n` +
-            `>\n` +
+            `> \n` +
             `**Exclusive Perks**\n` +
             `> • You get the <@&${config.discordBoostRoleId}> role\n` +
             `> • Access to woll colors\n` +
