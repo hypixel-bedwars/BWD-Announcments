@@ -33,7 +33,7 @@ export default {
             `> \n` +
             `**Exclusive Perks**\n` +
             `> • You get the <@&${config.discordBoostRoleId}> role\n` +
-            `> • Access to woll colors\n` +
+            `> • Access to wool colors\n` +
             `> • 4x the entries when entering giveaways`,
         )
         .setThumbnail(newMember.displayAvatarURL())
