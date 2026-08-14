@@ -3,5 +3,6 @@ export default interface AppConfig {
   discordGuildId: string;
   discordTagRoleId: string;
   discordBoostRoleId: string;
-  discordAnnouncmentChannelId: string;
+  discordTagAnnouncmentChannelId: string;
+  discordBoostAnnouncmentChannelId: string;
 }

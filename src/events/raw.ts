@@ -12,7 +12,7 @@ async function tagExecute(client: Client, user: APIUser) {
     const guild = await client.guilds.fetch(config.discordGuildId);
     const member = await guild.members.fetch(user.id);
     const announcmentChannel = await guild.channels.fetch(
-      config.discordAnnouncmentChannelId,
+      config.discordTagAnnouncmentChannelId,
     );
     // Give member the tag role
     member.roles.add(config.discordTagRoleId);
@@ -26,7 +26,7 @@ async function tagExecute(client: Client, user: APIUser) {
           `> ### **Role Unlocked**\n` +
           `> • <@&${config.discordTagRoleId}>\n` +
           `> ### Exclusive Perks\n` +
-          `> • +2 Giveaway entires\n` +
+          `> • +1 Giveaway entires\n` +
           `> • Streaming perms\n`
       )
       .setThumbnail(member.displayAvatarURL())

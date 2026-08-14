@@ -19,7 +19,7 @@ export default {
       // All the bot will need to do is announce the boost
       // Since the members are automatically given a role
       const channel = newMember.guild.channels.cache.get(
-        config.discordAnnouncmentChannelId
+        config.discordBoostAnnouncmentChannelId
       ) as TextChannel | undefined;
       if (!channel) return;
 
