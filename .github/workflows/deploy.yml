@@ -3,11 +3,12 @@ name: Remote VPS CD Deployment
 on:
   push:
     branches:
-      - main  # Triggers the runner only when pushing to your main branch
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
@@ -17,9 +18,10 @@ jobs:
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_SSH_PORT }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             cd /var/www/myapp
             git pull origin main
-            npm install --production   # Replace with your app's dependencies
-            pm2 restart myapp          # Replace with your preferred process manager/runner
+            npm install --production
+            pm2 restart myapp
