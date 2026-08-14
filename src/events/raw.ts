@@ -27,7 +27,7 @@ async function tagExecute(client: Client, user: APIUser) {
           `> • <@&${config.discordTagRoleId}>\n` +
           `> ### Exclusive Perks\n` +
           `> • +1 Giveaway entires\n` +
-          `> • Streaming perms\n`
+          `> • Streaming perms\n`,
       )
       .setThumbnail(member.displayAvatarURL())
       .setFooter({
@@ -40,6 +40,20 @@ async function tagExecute(client: Client, user: APIUser) {
     await announcmentChannel.send({
       embeds: [embed],
     });
+  }
+
+  if (
+    user.primary_guild == null ||
+    user.primary_guild.identity_guild_id !== config.discordGuildId
+  ) {
+    const guild = await client.guilds.fetch(config.discordGuildId);
+    const member = await guild.members.fetch(user.id).catch(() => null);
+    if (!member) return;
+
+    // Only remove if they actually have the role
+    if (member.roles.cache.has(config.discordTagRoleId)) {
+      await member.roles.remove(config.discordTagRoleId);
+    }
   }
 }
 
