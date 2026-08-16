@@ -14,7 +14,7 @@ export default {
     const wasBoosting = oldMember.premiumSince != null;
     const isBoosting = newMember.premiumSince != null;
 
-    if (!wasBoosting && isBoosting) {
+    if (!wasBoosting && isBoosting || wasBoosting && isBoosting) {
       // Since the members are automatically given a role
       // All the bot will need to do is announce the boost
       // Since the members are automatically given a role
