@@ -5,4 +5,7 @@ export default interface AppConfig {
   discordBoostRoleId: string;
   discordTagAnnouncmentChannelId: string;
   discordBoostAnnouncmentChannelId: string;
+  
+  discordTempVcCategoryId: string;
+  discordTempVcChannelId: string;
 }

@@ -19,5 +19,8 @@ export const config: AppConfig = {
   discordTagRoleId: getEnv("DISCORD_TAG_ROLE_ID"),
   discordBoostRoleId: getEnv("DISCORD_BOOST_ROLE_ID"),
   discordTagAnnouncmentChannelId: getEnv("DISCORD_TAG_ANNOUNCMENT_CHANNEL_ID"),
-  discordBoostAnnouncmentChannelId: getEnv("DISCORD_BOOST_ANNOUNCMENT_CHANNEL_ID")
+  discordBoostAnnouncmentChannelId: getEnv("DISCORD_BOOST_ANNOUNCMENT_CHANNEL_ID"),
+
+  discordTempVcCategoryId: getEnv("DISCORD_TEMPVC_CATEGORY_ID"),
+  discordTempVcChannelId: getEnv("DISCORD_TEMPVC_CHANNEL_ID"),
 } as const;
