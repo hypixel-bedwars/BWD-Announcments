@@ -2,13 +2,12 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "disc
 
 export function stripDisplayNamePrefix(displayName: string): string {
   // Removes a leading [ ... ] bracket group (and any following space),
-  // e.g. "[323 💫] VA80" -> "VA80", "[32 ⭐] OBF77" -> "OBF77"
   return displayName.replace(/^\[[^\]]*\]\s*/, "").trim();
 }
 
 export function buildChannelManagementMessage(ownerRoleId: string) {
   const embed = new EmbedBuilder()
-    .setColor(0x57f287) // Discord "green" — matches the left accent bar
+    .setColor(0x57f287)
     .setTitle("🎙️ Channel management")
     .setDescription(
       "> Once the channel has been created, you can do some customisation and configuration of your channel using the buttons below.\n\n" +
@@ -47,7 +46,7 @@ export function buildChannelManagementMessage(ownerRoleId: string) {
     new ButtonBuilder()
       .setCustomId("vc_kick")
       .setLabel("Kick user")
-      .setEmoji("📵")
+      .setEmoji("🦵")
       .setStyle(ButtonStyle.Danger),
     new ButtonBuilder()
       .setCustomId("vc_block")
