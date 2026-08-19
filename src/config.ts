@@ -23,4 +23,6 @@ export const config: AppConfig = {
 
   discordTempVcCategoryId: getEnv("DISCORD_TEMPVC_CATEGORY_ID"),
   discordTempVcChannelId: getEnv("DISCORD_TEMPVC_CHANNEL_ID"),
+  discordTempVcModeratorRoleId: getEnv("DISCORD_TEMPVC_MODERATOR_ROLE_ID"),
+  discordVerifiedRoleId: getEnv("DISCORD_VERIFIED_ROLE_ID"),
 } as const;

@@ -71,10 +71,6 @@ export default {
 
       tagExecute(client, user);
 
-      console.log(
-        `${user.username} primary_guild changed:`,
-        user.primary_guild,
-      );
     }
   },
 } satisfies Event<"raw">;

@@ -8,4 +8,6 @@ export default interface AppConfig {
   
   discordTempVcCategoryId: string;
   discordTempVcChannelId: string;
+  discordTempVcModeratorRoleId: string;
+  discordVerifiedRoleId: string;
 }
