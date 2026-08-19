@@ -6,7 +6,10 @@ import {
   deleteTempVcChannel,
   tempVcChannelExists,
 } from "../database/repository/temp_channels.js";
-import { stripDisplayNamePrefix } from "../utils.js";
+import {
+  buildChannelManagementMessage,
+  stripDisplayNamePrefix,
+} from "../utils.js";
 
 export default {
   name: Events.VoiceStateUpdate,
@@ -15,11 +18,17 @@ export default {
     const newChannel = newState.channelId;
 
     const vcChannelNamePrefix = "《 🔊 》";
-    const userUsername = stripDisplayNamePrefix(newState.member!.user.displayName);
-    
+    const userUsername = stripDisplayNamePrefix(
+      newState.member!.user.displayName,
+    );
+
     const channelName = `${vcChannelNamePrefix}${userUsername}'s Channel`;
 
-    if (newChannel && newChannel === config.discordTempVcChannelId && oldChannel !== newChannel) {
+    if (
+      newChannel &&
+      newChannel === config.discordTempVcChannelId &&
+      oldChannel !== newChannel
+    ) {
       const guild = await client.guilds.fetch(config.discordGuildId);
 
       const tempVcChannel = await guild.channels.create({
@@ -27,14 +36,28 @@ export default {
         type: ChannelType.GuildVoice,
         parent: config.discordTempVcCategoryId,
       });
-
-      await tempVcChannel.permissionOverwrites.create(newState.member!.user.id, {
-        Connect: true,
-      });
+      await tempVcChannel.permissionOverwrites.create(
+        newState.member!.user.id,
+        {
+          Connect: true,
+        },
+      );
 
       // Move the user to the VC
       await newState.member!.voice.setChannel(tempVcChannel);
       createTempVcChannel(tempVcChannel.id, newState.member!.user.id);
+
+      try {
+        const { embeds, components } = buildChannelManagementMessage(
+          config.discordTempVcModeratorRoleId,
+        );
+        await tempVcChannel.send({ embeds, components });
+      } catch (err) {
+        console.error(
+          `Failed to send channel management embed in ${tempVcChannel.id}:`,
+          err,
+        );
+      }
     }
 
     // Left a channel (disconnected, or moved elsewhere) then check if it was a
@@ -48,7 +71,9 @@ export default {
             // Channel may have already been deleted (race condition)
           });
           deleteTempVcChannel(oldChannel);
-          console.log(`Deleted empty temp VC: ${leftChannel.name} (${oldChannel})`);
+          console.log(
+            `Deleted empty temp VC: ${leftChannel.name} (${oldChannel})`,
+          );
         }
       }
     }
