@@ -34,11 +34,16 @@ export function buildChannelManagementMessage(ownerRoleId: string) {
       .setLabel("Close channel")
       .setEmoji("🔒")
       .setStyle(ButtonStyle.Danger),
+    // new ButtonBuilder()
+    //   .setCustomId("vc_invite")
+    //   .setLabel("Invite user")
+    //   .setEmoji("👤")
+    //   .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
-      .setCustomId("vc_invite")
-      .setLabel("Invite user")
-      .setEmoji("👤")
-      .setStyle(ButtonStyle.Secondary),
+      .setCustomId("vc_party")
+      .setLabel("Get party command")
+      .setEmoji("👯")
+      .setStyle(ButtonStyle.Success),
   );
 
   // Row 2 — user moderation

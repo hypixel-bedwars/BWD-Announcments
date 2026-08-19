@@ -5,6 +5,8 @@ import {
   ModalBuilder,
   TextInputStyle,
   UserSelectMenuBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   type VoiceChannel,
   type ButtonInteraction,
   type ModalSubmitInteraction,
@@ -13,6 +15,7 @@ import {
 } from "discord.js";
 import { Event } from "../models/types/event.js";
 import { config } from "../config.js";
+import { stripDisplayNamePrefix } from "../utils.js";
 import {
   getTempVcChannel,
   setChannelName,
@@ -24,6 +27,8 @@ import {
   isUserBanned,
   transferOwnership,
 } from "../database/repository/temp_channels.js";
+
+const PARTY_MAX = 8;
 
 // ---------- Shared helpers ----------
 
@@ -52,6 +57,25 @@ async function replyDenied(
   });
 }
 
+// customIds that skip the owner/moderator gate — party is available to anyone in the VC
+const noAuthRequired = new Set(["vc_party", "vc_party_all", "vc_party_select"]);
+
+async function requireInVoice(
+  interaction: ButtonInteraction | UserSelectMenuInteraction,
+): Promise<boolean> {
+  const guildMember = await interaction
+    .guild!.members.fetch(interaction.user.id)
+    .catch(() => null);
+  if (guildMember?.voice.channelId !== interaction.channelId) {
+    await interaction.reply({
+      content: "You need to be in this voice channel to use that.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return false;
+  }
+  return true;
+}
+
 // ---------- Button handlers ----------
 
 const buttonHandlers: Record<
@@ -61,7 +85,8 @@ const buttonHandlers: Record<
   vc_edit: handleEditChannel,
   vc_open: handleOpenChannel,
   vc_close: handleCloseChannel,
-  vc_invite: handleInviteUser,
+  vc_party: handleParty,
+  vc_party_all: handlePartyAll,
   vc_kick: handleKickUser,
   vc_block: handleBlockUser,
   vc_unblock: handleUnblockUser,
@@ -75,7 +100,7 @@ const selectMenuHandlers: Record<
   string,
   (interaction: UserSelectMenuInteraction) => Promise<void>
 > = {
-  vc_invite_select: handleInviteUserSelected,
+  vc_party_select: handlePartySelected,
   vc_kick_select: handleKickUserSelected,
   vc_block_select: handleBlockUserSelected,
   vc_unblock_select: handleUnblockUserSelected,
@@ -100,8 +125,10 @@ export default {
           return;
         }
 
-        const authorized = await isAuthorized(interaction, tempVc.owner_id);
-        if (!authorized) return replyDenied(interaction);
+        if (!noAuthRequired.has(interaction.customId)) {
+          const authorized = await isAuthorized(interaction, tempVc.owner_id);
+          if (!authorized) return replyDenied(interaction);
+        }
 
         await handler(interaction);
         return;
@@ -129,8 +156,10 @@ export default {
           return;
         }
 
-        const authorized = await isAuthorized(interaction, tempVc.owner_id);
-        if (!authorized) return replyDenied(interaction);
+        if (!noAuthRequired.has(interaction.customId)) {
+          const authorized = await isAuthorized(interaction, tempVc.owner_id);
+          if (!authorized) return replyDenied(interaction);
+        }
 
         await handler(interaction);
         return;
@@ -163,6 +192,12 @@ export default {
 
 async function handleEditChannel(interaction: ButtonInteraction) {
   const tempVc = getTempVcChannel(interaction.channelId)!;
+  const channel = interaction.channel as VoiceChannel;
+
+  // Prefer the DB-tracked name, but fall back to the channel's actual current
+  // name so the field is always prefilled — this way submitting without
+  // touching it results in no change.
+  const currentName = tempVc.name ?? channel.name;
 
   const modal = new ModalBuilder()
     .setCustomId("edit-vc-modal")
@@ -173,7 +208,7 @@ async function handleEditChannel(interaction: ButtonInteraction) {
     .setLabel("Voice channel name")
     .setPlaceholder("Enter the new channel name")
     .setStyle(TextInputStyle.Short)
-    .setValue(tempVc.name ?? "")
+    .setValue(currentName)
     .setRequired(true)
     .setMaxLength(100);
 
@@ -214,6 +249,7 @@ async function handleEditChannelSubmit(interaction: ModalSubmitInteraction) {
     return;
   }
 
+  const channel = interaction.channel as VoiceChannel;
   const newName = interaction.fields.getTextInputValue("vc-name").trim();
   const rawCapacity = interaction.fields
     .getTextInputValue("vc-capacity")
@@ -228,12 +264,17 @@ async function handleEditChannelSubmit(interaction: ModalSubmitInteraction) {
     return;
   }
 
-  const channel = interaction.channel as VoiceChannel;
-  await channel.setName(newName);
-  await channel.setUserLimit(newCapacity);
+  // Only touch the name if it actually changed — avoids a wasted API call
+  // when the user submits the prefilled value untouched.
+  if (newName !== channel.name) {
+    await channel.setName(newName);
+    setChannelName(interaction.channelId!, newName);
+  }
 
-  setChannelName(interaction.channelId!, newName);
-  setUserLimit(interaction.channelId!, newCapacity);
+  if (newCapacity !== tempVc.user_limit) {
+    await channel.setUserLimit(newCapacity);
+    setUserLimit(interaction.channelId!, newCapacity);
+  }
 
   await interaction.reply({
     content: `Channel updated: **${newName}**, limit **${newCapacity === 0 ? "unlimited" : newCapacity}**.`,
@@ -269,35 +310,87 @@ async function handleCloseChannel(interaction: ButtonInteraction) {
   });
 }
 
-// ---------- Invite ----------
+// ---------- Party ----------
 
-async function handleInviteUser(interaction: ButtonInteraction) {
+async function handleParty(interaction: ButtonInteraction) {
+  if (!(await requireInVoice(interaction))) return;
+
   const select = new UserSelectMenuBuilder()
-    .setCustomId("vc_invite_select")
-    .setPlaceholder("Choose a user to invite")
+    .setCustomId("vc_party_select")
+    .setPlaceholder(`Choose up to ${PARTY_MAX} people`)
     .setMinValues(1)
-    .setMaxValues(1);
+    .setMaxValues(PARTY_MAX);
+
+  const allButton = new ButtonBuilder()
+    .setCustomId("vc_party_all")
+    .setLabel("Select everyone in VC")
+    .setEmoji("👯")
+    .setStyle(ButtonStyle.Success);
 
   await interaction.reply({
-    content: "Who would you like to invite?",
+    content:
+      "Choose who to add to your party, or grab everyone currently in the VC.",
     components: [
       new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(select),
+      new ActionRowBuilder<ButtonBuilder>().addComponents(allButton),
     ],
     flags: MessageFlags.Ephemeral,
   });
 }
 
-async function handleInviteUserSelected(
-  interaction: UserSelectMenuInteraction,
-) {
-  const target = interaction.users.first()!;
-  const channel = interaction.channel as VoiceChannel;
+async function handlePartySelected(interaction: UserSelectMenuInteraction) {
+  const selectedIds = interaction.values;
 
-  await channel.permissionOverwrites.edit(target.id, { Connect: true });
+  const members = await Promise.all(
+    selectedIds.map((id) =>
+      interaction.guild!.members.fetch(id).catch(() => null),
+    ),
+  );
+  const validMembers = members.filter(
+    (m): m is NonNullable<typeof m> => m !== null,
+  );
+
+  const names = validMembers.map((m) => stripDisplayNamePrefix(m.displayName));
+  const command = `/p ${names.join(" ")}`;
 
   await interaction.update({
-    content: `✅ Invited **${target.username}** — they can now join.`,
+    content: `Copy this into chat:\n\`\`\`${command}\`\`\``,
     components: [],
+  });
+}
+
+async function handlePartyAll(interaction: ButtonInteraction) {
+  if (!(await requireInVoice(interaction))) return;
+
+  const channel = interaction.channel as VoiceChannel;
+  const others = channel.members.filter(
+    (m) => m.id !== interaction.user.id && !m.user.bot,
+  );
+
+  if (others.size === 0) {
+    await interaction.reply({
+      content: "There's no one else in the VC to party with.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  if (others.size > PARTY_MAX) {
+    await interaction.reply({
+      content:
+        `There are ${others.size} other people in the VC — more than the party max of ${PARTY_MAX}. ` +
+        `Use "Get party command" again and pick up to ${PARTY_MAX} manually.`,
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  const names = others.map((m) => stripDisplayNamePrefix(m.displayName));
+  const command = `/p ${names.join(" ")}`;
+
+  await interaction.reply({
+    content: `Copy this into chat:\n\`\`\`${command}\`\`\``,
+    flags: MessageFlags.Ephemeral,
   });
 }
 
