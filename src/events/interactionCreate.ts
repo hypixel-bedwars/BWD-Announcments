@@ -34,6 +34,7 @@ import {
   unbanUser,
   isUserBanned,
   transferOwnership,
+  getBannedUsers,
 } from "../database/repository/temp_channels.js";
 
 const PARTY_MAX = 8;
@@ -123,12 +124,11 @@ const buttonHandlers: Record<
 
 // ---------- Select menu handlers (customId -> action) ----------
 
+// Too laxy to remove this ad rewire it so will do it later
 const selectMenuHandlers: Record<
   string,
   (interaction: UserSelectMenuInteraction) => Promise<void>
-> = {
-  vc_unblock_select: handleUnblockUserSelected,
-};
+> = {};
 
 // ---------- String select menu handlers (customId -> action) ----------
 
@@ -140,6 +140,7 @@ const stringSelectMenuHandlers: Record<
   vc_block_select: handleBlockUserSelected,
   vc_party_select: handlePartySelected,
   vc_transfer_select: handleTransferOwnershipSelected,
+  vc_unblock_select: handleUnblockUserSelected,
 };
 
 export default {
@@ -822,49 +823,101 @@ async function handleBlockUserSelected(
 // ---------- Unblock ----------
 
 async function handleUnblockUser(interaction: ButtonInteraction) {
-  const select = new UserSelectMenuBuilder()
+  const channel = interaction.channel as VoiceChannel;
+
+  if (!channel?.isVoiceBased()) {
+    await interaction.reply({
+      embeds: [
+        buildErrorEmbed(
+          "Channel Unavailable",
+          "The voice channel is no longer available.",
+        ),
+      ],
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  const bannedIds = getBannedUsers(channel.id);
+
+  if (bannedIds.length === 0) {
+    await interaction.reply({
+      embeds: [
+        buildErrorEmbed(
+          "No One to Unblock!",
+          "No blocked users found to unblock right now.",
+        ),
+      ],
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  // Resolve each banned ID to a member for a friendly label — fall back to
+  // the raw ID if they're no longer fetchable (left the server, etc.), so
+  // they can still be unblocked even without a resolvable profile.
+  const options = await Promise.all(
+    bannedIds.map(async (id) => {
+      const member = await interaction
+        .guild!.members.fetch(id)
+        .catch(() => null);
+      const label = member
+        ? stripDisplayNamePrefix(member.displayName)
+        : `Unknown user (${id})`;
+      const description = member ? member.user.username : "No longer in server";
+
+      return new StringSelectMenuOptionBuilder()
+        .setLabel(label.slice(0, 100))
+        .setDescription(description.slice(0, 100))
+        .setValue(id);
+    }),
+  );
+
+  const select = new StringSelectMenuBuilder()
     .setCustomId("vc_unblock_select")
     .setPlaceholder("Choose a user to unblock")
     .setMinValues(1)
-    .setMaxValues(1);
+    .setMaxValues(1)
+    .addOptions(options);
 
   await interaction.reply({
     embeds: [
       buildActionEmbed("📞", "Unblock User", "Who would you like to unblock?"),
     ],
     components: [
-      new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(select),
+      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select),
     ],
     flags: MessageFlags.Ephemeral,
   });
 }
 
 async function handleUnblockUserSelected(
-  interaction: UserSelectMenuInteraction,
+  interaction: StringSelectMenuInteraction,
 ) {
-  const target = interaction.users.first()!;
+  const targetId = interaction.values[0];
+  const channel = interaction.channel as VoiceChannel;
 
-  if (!isUserBanned(interaction.channelId, target.id)) {
+  if (!isUserBanned(interaction.channelId, targetId)) {
     await interaction.update({
-      embeds: [
-        buildErrorEmbed("Not Blocked", `**${target.username}** isn't blocked.`),
-      ],
+      embeds: [buildErrorEmbed("Not Blocked", "That user isn't blocked.")],
       components: [],
     });
     return;
   }
 
-  const channel = interaction.channel as VoiceChannel;
-  await channel.permissionOverwrites.delete(target.id);
-  unbanUser(interaction.channelId, target.id);
+  await channel.permissionOverwrites.delete(targetId).catch(() => {});
+  unbanUser(interaction.channelId, targetId);
+
+  const member = await interaction
+    .guild!.members.fetch(targetId)
+    .catch(() => null);
+  const name = member
+    ? stripDisplayNamePrefix(member.displayName)
+    : "that user";
 
   await interaction.update({
     embeds: [
-      buildActionEmbed(
-        "✅",
-        "User Unblocked",
-        `**${target.username}** was unblocked.`,
-      ),
+      buildActionEmbed("✅", "User Unblocked", `**${name}** was unblocked.`),
     ],
     components: [],
   });
