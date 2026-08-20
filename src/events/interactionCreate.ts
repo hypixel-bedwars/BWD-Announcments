@@ -576,14 +576,14 @@ async function handleBlockUser(interaction: ButtonInteraction) {
 
   const members = channel.members;
 
-  // Don't allow the person using the button to kick themselves
+  // Don't allow the person using the button to block themselves
   const kickableMembers = members.filter(
     (member) => member.id !== interaction.user.id,
   );
 
   if (kickableMembers.size === 0) {
     await interaction.reply({
-      content: "There are no other members in the VC to kick.",
+      content: "There are no other members in the VC to block.",
       flags: MessageFlags.Ephemeral,
     });
 
@@ -780,14 +780,13 @@ async function handleTransferOwnership(interaction: ButtonInteraction) {
 
   const members = channel.members;
 
-  // Don't allow the person using the button to kick themselves
   const eligibalMembers = members.filter(
     (member) => member.id !== interaction.user.id,
   );
 
   if (eligibalMembers.size === 0) {
     await interaction.reply({
-      content: "There are no other members in the VC to kick.",
+      content: "There are no other members in the VC to transfer ownership to.",
       flags: MessageFlags.Ephemeral,
     });
 
