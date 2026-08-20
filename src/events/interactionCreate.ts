@@ -19,7 +19,11 @@ import {
 } from "discord.js";
 import { Event } from "../models/types/event.js";
 import { config } from "../config.js";
-import { stripDisplayNamePrefix } from "../utils.js";
+import {
+  stripDisplayNamePrefix,
+  buildActionEmbed,
+  buildErrorEmbed,
+} from "../utils.js";
 import {
   getTempVcChannel,
   setChannelName,
@@ -60,7 +64,12 @@ async function replyDenied(
     ButtonInteraction | UserSelectMenuInteraction | StringSelectMenuInteraction,
 ) {
   await interaction.reply({
-    content: "Only the channel owner or a moderator can do that.",
+    embeds: [
+      buildErrorEmbed(
+        "Access Denied",
+        "Only the channel owner or a moderator can do that.",
+      ),
+    ],
     flags: MessageFlags.Ephemeral,
   });
 }
@@ -81,7 +90,12 @@ async function requireInVoice(
     .catch(() => null);
   if (guildMember?.voice.channelId !== interaction.channelId) {
     await interaction.reply({
-      content: "You need to be in this voice channel to use that.",
+      embeds: [
+        buildErrorEmbed(
+          "Not In Channel",
+          "You need to be in this voice channel to use that.",
+        ),
+      ],
       flags: MessageFlags.Ephemeral,
     });
     return false;
@@ -106,6 +120,7 @@ const buttonHandlers: Record<
   vc_claim: handleClaimOwnership,
   vc_transfer: handleTransferOwnership,
 };
+
 // ---------- Select menu handlers (customId -> action) ----------
 
 const selectMenuHandlers: Record<
@@ -138,8 +153,12 @@ export default {
         const tempVc = getTempVcChannel(interaction.channelId);
         if (!tempVc) {
           await interaction.reply({
-            content:
-              "This button isn't tied to an active temp channel anymore.",
+            embeds: [
+              buildErrorEmbed(
+                "Channel Not Tracked",
+                "This button isn't tied to an active temp channel anymore.",
+              ),
+            ],
             flags: MessageFlags.Ephemeral,
           });
           return;
@@ -169,8 +188,12 @@ export default {
         const tempVc = getTempVcChannel(interaction.channelId);
         if (!tempVc) {
           await interaction.reply({
-            content:
-              "This action isn't tied to an active temp channel anymore.",
+            embeds: [
+              buildErrorEmbed(
+                "Channel Not Tracked",
+                "This action isn't tied to an active temp channel anymore.",
+              ),
+            ],
             flags: MessageFlags.Ephemeral,
           });
           return;
@@ -192,8 +215,12 @@ export default {
         const tempVc = getTempVcChannel(interaction.channelId);
         if (!tempVc) {
           await interaction.reply({
-            content:
-              "This action isn't tied to an active temp channel anymore.",
+            embeds: [
+              buildErrorEmbed(
+                "Channel Not Tracked",
+                "This action isn't tied to an active temp channel anymore.",
+              ),
+            ],
             flags: MessageFlags.Ephemeral,
           });
           return;
@@ -212,18 +239,21 @@ export default {
         `Error handling interaction "${(interaction as any).customId}":`,
         err,
       );
-      const errorMessage = "Something went wrong handling that action.";
+      const errorEmbed = buildErrorEmbed(
+        "Something Went Wrong",
+        "Something went wrong handling that action.",
+      );
       if (
         "replied" in interaction &&
         (interaction.replied || interaction.deferred)
       ) {
         await interaction.followUp({
-          content: errorMessage,
+          embeds: [errorEmbed],
           flags: MessageFlags.Ephemeral,
         });
       } else if ("reply" in interaction) {
         await interaction.reply({
-          content: errorMessage,
+          embeds: [errorEmbed],
           flags: MessageFlags.Ephemeral,
         });
       }
@@ -237,9 +267,6 @@ async function handleEditChannel(interaction: ButtonInteraction) {
   const tempVc = getTempVcChannel(interaction.channelId)!;
   const channel = interaction.channel as VoiceChannel;
 
-  // Prefer the DB-tracked name, but fall back to the channel's actual current
-  // name so the field is always prefilled — this way submitting without
-  // touching it results in no change.
   const currentName = tempVc.name ?? channel.name;
 
   const modal = new ModalBuilder()
@@ -277,7 +304,12 @@ async function handleEditChannelSubmit(interaction: ModalSubmitInteraction) {
   const tempVc = getTempVcChannel(interaction.channelId!);
   if (!tempVc) {
     await interaction.reply({
-      content: "This channel is no longer tracked.",
+      embeds: [
+        buildErrorEmbed(
+          "Channel Not Tracked",
+          "This channel is no longer tracked.",
+        ),
+      ],
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -286,7 +318,12 @@ async function handleEditChannelSubmit(interaction: ModalSubmitInteraction) {
   const authorized = await isAuthorized(interaction, tempVc.owner_id);
   if (!authorized) {
     await interaction.reply({
-      content: "Only the channel owner or a moderator can do that.",
+      embeds: [
+        buildErrorEmbed(
+          "Access Denied",
+          "Only the channel owner or a moderator can do that.",
+        ),
+      ],
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -301,14 +338,17 @@ async function handleEditChannelSubmit(interaction: ModalSubmitInteraction) {
 
   if (!Number.isInteger(newCapacity) || newCapacity < 0 || newCapacity > 99) {
     await interaction.reply({
-      content: "Capacity must be a whole number between 0 and 99.",
+      embeds: [
+        buildErrorEmbed(
+          "Invalid Capacity",
+          "Capacity must be a whole number between 0 and 99.",
+        ),
+      ],
       flags: MessageFlags.Ephemeral,
     });
     return;
   }
 
-  // Only touch the name if it actually changed — avoids a wasted API call
-  // when the user submits the prefilled value untouched.
   if (newName !== channel.name) {
     await channel.setName(newName);
     setChannelName(interaction.channelId!, newName);
@@ -320,7 +360,13 @@ async function handleEditChannelSubmit(interaction: ModalSubmitInteraction) {
   }
 
   await interaction.reply({
-    content: `Channel updated: **${newName}**, limit **${newCapacity === 0 ? "unlimited" : newCapacity}**.`,
+    embeds: [
+      buildActionEmbed(
+        "✏️",
+        "Channel Updated",
+        `Channel: <#${interaction.channelId}> is now **${newName}**, limit **${newCapacity === 0 ? "unlimited" : newCapacity}**.`,
+      ),
+    ],
     flags: MessageFlags.Ephemeral,
   });
 }
@@ -329,6 +375,9 @@ async function handleEditChannelSubmit(interaction: ModalSubmitInteraction) {
 
 async function handleOpenChannel(interaction: ButtonInteraction) {
   const channel = interaction.channel as VoiceChannel;
+
+  const wasLocked = getTempVcChannel(interaction.channelId)?.is_locked === 1;
+
   await channel.permissionOverwrites.edit(interaction.guild!.roles.everyone, {
     Connect: true,
   });
@@ -338,13 +387,28 @@ async function handleOpenChannel(interaction: ButtonInteraction) {
   unlockChannel(interaction.channelId);
 
   await interaction.reply({
-    content: "🔓 Channel opened — anyone can join.",
+    embeds: [
+      wasLocked
+        ? buildActionEmbed(
+            "🔓",
+            "Channel Opened",
+            `Channel: <#${interaction.channelId}> is now open for everyone to join!`,
+          )
+        : buildActionEmbed(
+            "🔓",
+            "Channel Already Open",
+            `Channel: <#${interaction.channelId}> is already open for everyone to join! No changes were needed.`,
+          ),
+    ],
     flags: MessageFlags.Ephemeral,
   });
 }
 
 async function handleCloseChannel(interaction: ButtonInteraction) {
   const channel = interaction.channel as VoiceChannel;
+
+  const wasLocked = getTempVcChannel(interaction.channelId)?.is_locked === 1;
+
   await channel.permissionOverwrites.edit(interaction.guild!.roles.everyone, {
     Connect: false,
   });
@@ -354,7 +418,19 @@ async function handleCloseChannel(interaction: ButtonInteraction) {
   lockChannel(interaction.channelId);
 
   await interaction.reply({
-    content: "🔒 Channel closed — only allowed users can join.",
+    embeds: [
+      wasLocked
+        ? buildActionEmbed(
+            "🔒",
+            "Channel Already Locked",
+            `Channel: <#${interaction.channelId}> is already closed for all members. No changes were needed.`,
+          )
+        : buildActionEmbed(
+            "🔒",
+            "Channel Locked",
+            `Channel: <#${interaction.channelId}> is now closed for all members. Access restricted!`,
+          ),
+    ],
     flags: MessageFlags.Ephemeral,
   });
 }
@@ -368,7 +444,12 @@ async function handleParty(interaction: ButtonInteraction) {
 
   if (!channel?.isVoiceBased()) {
     await interaction.reply({
-      content: "This command can only be used in a voice channel.",
+      embeds: [
+        buildErrorEmbed(
+          "Wrong Channel Type",
+          "This command can only be used in a voice channel.",
+        ),
+      ],
       flags: MessageFlags.Ephemeral,
     });
 
@@ -402,8 +483,13 @@ async function handleParty(interaction: ButtonInteraction) {
     .setStyle(ButtonStyle.Success);
 
   await interaction.reply({
-    content:
-      "Choose who to add to your party, or grab everyone currently in the VC.",
+    embeds: [
+      buildActionEmbed(
+        "👯",
+        "Party Time",
+        "Choose who to add to your party, or grab everyone currently in the VC.",
+      ),
+    ],
     components: [
       new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select),
       new ActionRowBuilder<ButtonBuilder>().addComponents(allButton),
@@ -421,7 +507,12 @@ async function handlePartySelected(interaction: StringSelectMenuInteraction) {
 
   if (members.length === 0) {
     await interaction.update({
-      content: "None of the selected users could be found.",
+      embeds: [
+        buildErrorEmbed(
+          "No Users Found",
+          "None of the selected users could be found.",
+        ),
+      ],
       components: [],
     });
     return;
@@ -430,11 +521,16 @@ async function handlePartySelected(interaction: StringSelectMenuInteraction) {
   const names = members.map((member) =>
     stripDisplayNamePrefix(member.displayName),
   );
-
   const command = `/p ${names.join(" ")}`;
 
   await interaction.update({
-    content: `Copy this into chat:\n\`\`\`${command}\`\`\``,
+    embeds: [
+      buildActionEmbed(
+        "👯",
+        "Party Command Ready",
+        `Copy this into chat:\n\`\`\`${command}\`\`\``,
+      ),
+    ],
     components: [],
   });
 }
@@ -449,7 +545,12 @@ async function handlePartyAll(interaction: ButtonInteraction) {
 
   if (others.size === 0) {
     await interaction.reply({
-      content: "There's no one else in the VC to party with.",
+      embeds: [
+        buildErrorEmbed(
+          "No One to Party With!",
+          "There's no one else in the VC to party with.",
+        ),
+      ],
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -457,9 +558,13 @@ async function handlePartyAll(interaction: ButtonInteraction) {
 
   if (others.size > PARTY_MAX) {
     await interaction.reply({
-      content:
-        `There are ${others.size} other people in the VC — more than the party max of ${PARTY_MAX}. ` +
-        `Use "Get party command" again and pick up to ${PARTY_MAX} manually.`,
+      embeds: [
+        buildErrorEmbed(
+          "Too Many People!",
+          `There are ${others.size} other people in the VC — more than the party max of ${PARTY_MAX}. ` +
+            `Use "Get party command" again and pick up to ${PARTY_MAX} manually.`,
+        ),
+      ],
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -469,7 +574,13 @@ async function handlePartyAll(interaction: ButtonInteraction) {
   const command = `/p ${names.join(" ")}`;
 
   await interaction.reply({
-    content: `Copy this into chat:\n\`\`\`${command}\`\`\``,
+    embeds: [
+      buildActionEmbed(
+        "👯",
+        "Party Command Ready",
+        `Copy this into chat:\n\`\`\`${command}\`\`\``,
+      ),
+    ],
     flags: MessageFlags.Ephemeral,
   });
 }
@@ -481,26 +592,32 @@ async function handleKickUser(interaction: ButtonInteraction) {
 
   if (!channel?.isVoiceBased()) {
     await interaction.reply({
-      content: "This command can only be used in a voice channel.",
+      embeds: [
+        buildErrorEmbed(
+          "Wrong Channel Type",
+          "This command can only be used in a voice channel.",
+        ),
+      ],
       flags: MessageFlags.Ephemeral,
     });
-
     return;
   }
 
   const members = channel.members;
-
-  // Don't allow the person using the button to kick themselves
   const kickableMembers = members.filter(
     (member) => member.id !== interaction.user.id,
   );
 
   if (kickableMembers.size === 0) {
     await interaction.reply({
-      content: "There are no other members in the VC to kick.",
+      embeds: [
+        buildErrorEmbed(
+          "No One to Kick!",
+          "There is currently no one to kick in the channel.",
+        ),
+      ],
       flags: MessageFlags.Ephemeral,
     });
-
     return;
   }
 
@@ -519,7 +636,13 @@ async function handleKickUser(interaction: ButtonInteraction) {
     );
 
   await interaction.reply({
-    content: "Who would you like to kick? (They can rejoin unless blocked.)",
+    embeds: [
+      buildActionEmbed(
+        "📵",
+        "Manage Members",
+        "Let's tidy up the channel. Pick a member to kick. Moderators and admins are exempt from being kicked.",
+      ),
+    ],
     components: [
       new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select),
     ],
@@ -535,7 +658,12 @@ async function handleKickUserSelected(
 
   if (!channel?.isVoiceBased()) {
     await interaction.reply({
-      content: "The voice channel is no longer available.",
+      embeds: [
+        buildErrorEmbed(
+          "Channel Unavailable",
+          "The voice channel is no longer available.",
+        ),
+      ],
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -545,17 +673,27 @@ async function handleKickUserSelected(
 
   if (!member) {
     await interaction.reply({
-      content: "That user is no longer in the voice channel.",
+      embeds: [
+        buildErrorEmbed(
+          "User Not Found",
+          "That user is no longer in the voice channel.",
+        ),
+      ],
       flags: MessageFlags.Ephemeral,
     });
     return;
   }
 
-  // Disconnect them from the VC
   await member.voice.disconnect("Kicked from voice channel");
 
   await interaction.update({
-    content: `🦵 Kicked **${stripDisplayNamePrefix(member.user.displayName)}** from the channel.`,
+    embeds: [
+      buildActionEmbed(
+        "🦵",
+        "Member Kicked",
+        `**${stripDisplayNamePrefix(member.user.displayName)}** was kicked from the channel.`,
+      ),
+    ],
     components: [],
   });
 }
@@ -567,26 +705,32 @@ async function handleBlockUser(interaction: ButtonInteraction) {
 
   if (!channel?.isVoiceBased()) {
     await interaction.reply({
-      content: "This command can only be used in a voice channel.",
+      embeds: [
+        buildErrorEmbed(
+          "Wrong Channel Type",
+          "This command can only be used in a voice channel.",
+        ),
+      ],
       flags: MessageFlags.Ephemeral,
     });
-
     return;
   }
 
   const members = channel.members;
-
-  // Don't allow the person using the button to block themselves
-  const kickableMembers = members.filter(
+  const blockableMembers = members.filter(
     (member) => member.id !== interaction.user.id,
   );
 
-  if (kickableMembers.size === 0) {
+  if (blockableMembers.size === 0) {
     await interaction.reply({
-      content: "There are no other members in the VC to block.",
+      embeds: [
+        buildErrorEmbed(
+          "No One to Block!",
+          "There is currently no one to block in the channel.",
+        ),
+      ],
       flags: MessageFlags.Ephemeral,
     });
-
     return;
   }
 
@@ -596,7 +740,7 @@ async function handleBlockUser(interaction: ButtonInteraction) {
     .setMinValues(1)
     .setMaxValues(1)
     .addOptions(
-      kickableMembers.map((member) =>
+      blockableMembers.map((member) =>
         new StringSelectMenuOptionBuilder()
           .setLabel(stripDisplayNamePrefix(member.displayName))
           .setDescription(member.user.username)
@@ -605,7 +749,13 @@ async function handleBlockUser(interaction: ButtonInteraction) {
     );
 
   await interaction.reply({
-    content: "Who would you like to block?",
+    embeds: [
+      buildActionEmbed(
+        "🚫",
+        "User Block",
+        "Time to make some space. Select a user to block from the channel. Keep in mind, moderators and admins are protected.",
+      ),
+    ],
     components: [
       new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select),
     ],
@@ -621,7 +771,12 @@ async function handleBlockUserSelected(
 
   if (!channel?.isVoiceBased()) {
     await interaction.reply({
-      content: "The voice channel is no longer available.",
+      embeds: [
+        buildErrorEmbed(
+          "Channel Unavailable",
+          "The voice channel is no longer available.",
+        ),
+      ],
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -631,7 +786,12 @@ async function handleBlockUserSelected(
 
   if (!member) {
     await interaction.reply({
-      content: "That user is no longer in the voice channel.",
+      embeds: [
+        buildErrorEmbed(
+          "User Not Found",
+          "That user is no longer in the voice channel.",
+        ),
+      ],
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -648,7 +808,13 @@ async function handleBlockUserSelected(
   }
 
   await interaction.update({
-    content: `🚫 Blocked **${stripDisplayNamePrefix(member.displayName)}** from this channel.`,
+    embeds: [
+      buildActionEmbed(
+        "🚫",
+        "User Blocked",
+        `**${stripDisplayNamePrefix(member.displayName)}** was blocked from this channel.`,
+      ),
+    ],
     components: [],
   });
 }
@@ -663,7 +829,9 @@ async function handleUnblockUser(interaction: ButtonInteraction) {
     .setMaxValues(1);
 
   await interaction.reply({
-    content: "Who would you like to unblock?",
+    embeds: [
+      buildActionEmbed("📞", "Unblock User", "Who would you like to unblock?"),
+    ],
     components: [
       new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(select),
     ],
@@ -678,7 +846,9 @@ async function handleUnblockUserSelected(
 
   if (!isUserBanned(interaction.channelId, target.id)) {
     await interaction.update({
-      content: `**${target.username}** isn't blocked.`,
+      embeds: [
+        buildErrorEmbed("Not Blocked", `**${target.username}** isn't blocked.`),
+      ],
       components: [],
     });
     return;
@@ -689,7 +859,13 @@ async function handleUnblockUserSelected(
   unbanUser(interaction.channelId, target.id);
 
   await interaction.update({
-    content: `✅ Unblocked **${target.username}**.`,
+    embeds: [
+      buildActionEmbed(
+        "✅",
+        "User Unblocked",
+        `**${target.username}** was unblocked.`,
+      ),
+    ],
     components: [],
   });
 }
@@ -703,7 +879,12 @@ async function handleClaimOwnership(interaction: ButtonInteraction) {
     const tempVc = getTempVcChannel(interaction.channelId);
     if (!tempVc) {
       await interaction.editReply({
-        content: "This voice channel is no longer being tracked.",
+        embeds: [
+          buildErrorEmbed(
+            "Channel Not Tracked",
+            "This voice channel is no longer being tracked.",
+          ),
+        ],
       });
       return;
     }
@@ -711,14 +892,30 @@ async function handleClaimOwnership(interaction: ButtonInteraction) {
     const currentOwner = await interaction
       .guild!.members.fetch(tempVc.owner_id)
       .catch(() => null);
-
     const ownerStillHere =
       currentOwner?.voice.channelId === interaction.channelId;
 
+    if (interaction.user.id === tempVc.owner_id) {
+      await interaction.editReply({
+        embeds: [
+          buildActionEmbed(
+            "👑",
+            "You Got This!",
+            `You're the current owner of <#${interaction.channelId}>. Keep leading!`,
+          ),
+        ],
+      });
+      return;
+    }
+
     if (ownerStillHere) {
       await interaction.editReply({
-        content:
-          "The current owner is still in the channel — ownership can't be claimed.",
+        embeds: [
+          buildErrorEmbed(
+            "Owner Still Present",
+            "The current owner is still in the channel — ownership can't be claimed.",
+          ),
+        ],
       });
       return;
     }
@@ -726,7 +923,12 @@ async function handleClaimOwnership(interaction: ButtonInteraction) {
     const channel = interaction.channel;
     if (!channel?.isVoiceBased()) {
       await interaction.editReply({
-        content: "This command can only be used in a voice channel.",
+        embeds: [
+          buildErrorEmbed(
+            "Wrong Channel Type",
+            "This command can only be used in a voice channel.",
+          ),
+        ],
       });
       return;
     }
@@ -739,7 +941,13 @@ async function handleClaimOwnership(interaction: ButtonInteraction) {
     transferOwnership(interaction.channelId, interaction.user.id);
 
     await interaction.editReply({
-      content: `👑 <@${interaction.user.id}> is now the owner of this channel.`,
+      embeds: [
+        buildActionEmbed(
+          "👑",
+          "Ownership Claimed",
+          `<@${interaction.user.id}> is now the owner of this channel.`,
+        ),
+      ],
     });
   } catch (error) {
     console.error("[CLAIM] Error claiming ownership:", error);
@@ -747,7 +955,12 @@ async function handleClaimOwnership(interaction: ButtonInteraction) {
     if (interaction.deferred || interaction.replied) {
       await interaction
         .editReply({
-          content: "Something went wrong while claiming ownership.",
+          embeds: [
+            buildErrorEmbed(
+              "Something Went Wrong",
+              "Something went wrong while claiming ownership.",
+            ),
+          ],
         })
         .catch(() => {});
     }
@@ -761,7 +974,12 @@ async function handleTransferOwnership(interaction: ButtonInteraction) {
 
   if (interaction.user.id !== tempVc.owner_id) {
     await interaction.reply({
-      content: "Only the current owner can transfer ownership.",
+      embeds: [
+        buildErrorEmbed(
+          "Access Denied",
+          "Only the current owner can transfer ownership.",
+        ),
+      ],
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -771,25 +989,32 @@ async function handleTransferOwnership(interaction: ButtonInteraction) {
 
   if (!channel?.isVoiceBased()) {
     await interaction.reply({
-      content: "This command can only be used in a voice channel.",
+      embeds: [
+        buildErrorEmbed(
+          "Wrong Channel Type",
+          "This command can only be used in a voice channel.",
+        ),
+      ],
       flags: MessageFlags.Ephemeral,
     });
-
     return;
   }
 
   const members = channel.members;
-
-  const eligibalMembers = members.filter(
+  const eligibleMembers = members.filter(
     (member) => member.id !== interaction.user.id,
   );
 
-  if (eligibalMembers.size === 0) {
+  if (eligibleMembers.size === 0) {
     await interaction.reply({
-      content: "There are no other members in the VC to transfer ownership to.",
+      embeds: [
+        buildErrorEmbed(
+          "No One to Transfer Ownership!",
+          "There is no suitable member to transfer ownership to right now.",
+        ),
+      ],
       flags: MessageFlags.Ephemeral,
     });
-
     return;
   }
 
@@ -799,7 +1024,7 @@ async function handleTransferOwnership(interaction: ButtonInteraction) {
     .setMinValues(1)
     .setMaxValues(1)
     .addOptions(
-      eligibalMembers.map((member) =>
+      eligibleMembers.map((member) =>
         new StringSelectMenuOptionBuilder()
           .setLabel(stripDisplayNamePrefix(member.displayName))
           .setDescription(member.user.username)
@@ -808,7 +1033,13 @@ async function handleTransferOwnership(interaction: ButtonInteraction) {
     );
 
   await interaction.reply({
-    content: "Who should be the new owner?",
+    embeds: [
+      buildActionEmbed(
+        "👑",
+        "Transfer Ownership",
+        "Who should be the new owner?",
+      ),
+    ],
     components: [
       new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select),
     ],
@@ -824,7 +1055,12 @@ async function handleTransferOwnershipSelected(
 
   if (interaction.user.id !== tempVc.owner_id) {
     await interaction.update({
-      content: "Only the current owner can transfer ownership.",
+      embeds: [
+        buildErrorEmbed(
+          "Access Denied",
+          "Only the current owner can transfer ownership.",
+        ),
+      ],
       components: [],
     });
     return;
@@ -834,22 +1070,32 @@ async function handleTransferOwnershipSelected(
 
   if (!channel?.isVoiceBased()) {
     await interaction.reply({
-      content: "The voice channel is no longer available.",
+      embeds: [
+        buildErrorEmbed(
+          "Channel Unavailable",
+          "The voice channel is no longer available.",
+        ),
+      ],
       flags: MessageFlags.Ephemeral,
     });
     return;
   }
-  
+
   const target = channel.members.get(targetId);
 
   if (!target) {
     await interaction.reply({
-      content: "That user is no longer in the voice channel.",
+      embeds: [
+        buildErrorEmbed(
+          "User Not Found",
+          "That user is no longer in the voice channel.",
+        ),
+      ],
       flags: MessageFlags.Ephemeral,
     });
     return;
   }
-  
+
   await channel.permissionOverwrites.edit(target.id, {
     Connect: true,
     ManageChannels: true,
@@ -859,7 +1105,13 @@ async function handleTransferOwnershipSelected(
   transferOwnership(interaction.channelId, target.id);
 
   await interaction.update({
-    content: `👑 Ownership transferred to **${target.user.username}**.`,
+    embeds: [
+      buildActionEmbed(
+        "👑",
+        "Ownership Transferred",
+        `Ownership transferred to **${target.user.username}**.`,
+      ),
+    ],
     components: [],
   });
 }

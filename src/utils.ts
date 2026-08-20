@@ -1,4 +1,13 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  EmbedBuilder,
+} from "discord.js";
+
+const EMBED_FOOTER = "Hypixel Bedwars • Enhanced for performance 🚀";
+const COLOR_SUCCESS = 0x57f287;
+const COLOR_ERROR = 0xed4245;
 
 export function stripDisplayNamePrefix(displayName: string): string {
   // Removes a leading [ ... ] bracket group (and any following space),
@@ -11,10 +20,10 @@ export function buildChannelManagementMessage(ownerRoleId: string) {
     .setTitle("🎙️ Channel management")
     .setDescription(
       "> Once the channel has been created, you can do some customisation and configuration of your channel using the buttons below.\n\n" +
-      `🌱 **Note:** In addition, only the channel owner & <@&${ownerRoleId}> can make these changes.`
+        `🌱 **Note:** In addition, only the channel owner & <@&${ownerRoleId}> can make these changes.`,
     )
     .setFooter({
-      text: "Hypixel Bedwars • Enhanced for performance 🚀"
+      text: "Hypixel Bedwars • Enhanced for performance 🚀",
     });
 
   // Row 1 — general controls
@@ -80,4 +89,24 @@ export function buildChannelManagementMessage(ownerRoleId: string) {
   );
 
   return { embeds: [embed], components: [row1, row2, row3] };
+}
+
+export function buildActionEmbed(
+  emoji: string,
+  title: string,
+  description: string,
+) {
+  return new EmbedBuilder()
+    .setColor(COLOR_SUCCESS)
+    .setTitle(`${emoji} ${title}`)
+    .setDescription(`> 🌱 - ${description}`)
+    .setFooter({ text: EMBED_FOOTER });
+}
+
+export function buildErrorEmbed(title: string, description: string) {
+  return new EmbedBuilder()
+    .setColor(COLOR_ERROR)
+    .setTitle(`⚠️ ${title}`)
+    .setDescription(`> ${description}`)
+    .setFooter({ text: `${EMBED_FOOTER}` });  
 }
