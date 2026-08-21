@@ -1,13 +1,23 @@
 import {
   ActionRowBuilder,
   ButtonBuilder,
+  ButtonInteraction,
   ButtonStyle,
   EmbedBuilder,
+  ModalSubmitInteraction,
+  StringSelectMenuInteraction,
+  VoiceChannel,
 } from "discord.js";
+import {
+  getTempVcChannel,
+  TempVcChannel,
+} from "./database/repository/temp_channels.js";
 
 const EMBED_FOOTER = "Hypixel Bedwars • Enhanced for performance 🚀";
 const COLOR_SUCCESS = 0x57f287;
 const COLOR_ERROR = 0xed4245;
+type AnyVcInteraction =
+  ButtonInteraction | ModalSubmitInteraction | StringSelectMenuInteraction;
 
 export function stripDisplayNamePrefix(displayName: string): string {
   // Removes a leading [ ... ] bracket group (and any following space),
@@ -108,5 +118,40 @@ export function buildErrorEmbed(title: string, description: string) {
     .setColor(COLOR_ERROR)
     .setTitle(`⚠️ ${title}`)
     .setDescription(`> ${description}`)
-    .setFooter({ text: `${EMBED_FOOTER}` });  
+    .setFooter({ text: `${EMBED_FOOTER}` });
+}
+
+export async function resolveTempVcContext(
+  interaction: AnyVcInteraction,
+): Promise<{ tempVc: TempVcChannel; channel: VoiceChannel } | null> {
+  if (!interaction.channelId) {
+    return null;
+  }
+  // Case 1: panel is posted inside the VC's own text chat — the fast path,
+  // no change from how this already worked.
+  let tempVc = getTempVcChannel(interaction.channelId);
+  let targetChannelId = interaction.channelId;
+
+  // Case 2: panel is posted in a general/central channel — fall back to
+  // whatever voice channel the person clicking is currently sitting in.
+  if (!tempVc) {
+    const guildMember = await interaction.guild?.members
+      .fetch(interaction.user.id)
+      .catch(() => null);
+    const voiceChannelId = guildMember?.voice.channelId;
+
+    if (voiceChannelId) {
+      tempVc = getTempVcChannel(voiceChannelId);
+      targetChannelId = voiceChannelId;
+    }
+  }
+
+  if (!tempVc) return null;
+
+  const channel = await interaction.guild?.channels
+    .fetch(targetChannelId)
+    .catch(() => null);
+  if (!channel || !channel.isVoiceBased()) return null;
+
+  return { tempVc, channel: channel as VoiceChannel };
 }

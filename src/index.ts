@@ -13,7 +13,6 @@ export const client = new Client({
 });
 
 await registerEvents(client);
-await registerCommands(client);
 
 initializeDatabase();
 
