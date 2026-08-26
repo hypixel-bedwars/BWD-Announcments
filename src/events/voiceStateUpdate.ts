@@ -1,4 +1,4 @@
-import { ChannelType, Events } from "discord.js";
+import { ChannelType, Events, PermissionOverwriteOptions } from "discord.js";
 import { Event } from "../models/types/event.js";
 import { config } from "../config.js";
 import {
@@ -36,11 +36,19 @@ export default {
         type: ChannelType.GuildVoice,
         parent: config.discordTempVcCategoryId,
       });
-      await tempVcChannel.permissionOverwrites.create(
+
+      const permissions: PermissionOverwriteOptions = {
+        Connect: true,
+        ...(newState.member!.roles.cache.some((role) =>
+          config.discordSoundBoardRolesId.includes(role.id),
+        )
+          ? { UseSoundboard: true }
+          : {}),
+      };
+
+      await tempVcChannel.permissionOverwrites.edit(
         newState.member!.user.id,
-        {
-          Connect: true,
-        },
+        permissions,
       );
 
       // Move the user to the VC
