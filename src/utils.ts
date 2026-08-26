@@ -82,6 +82,11 @@ export function buildChannelManagementMessage(ownerRoleId: string) {
       .setLabel("Unblock user")
       .setEmoji("📞")
       .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId("vc_soundboard")
+      .setLabel("SoundBoard Access")
+      .setEmoji("🔊")
+      .setStyle(ButtonStyle.Secondary),
   );
 
   // Row 3 — ownership
