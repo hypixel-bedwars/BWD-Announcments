@@ -1016,7 +1016,11 @@ async function handleSoundboardUser(interaction: ButtonInteraction) {
   if (!context) return replyNotInChannel(interaction);
   const { channel } = context;
 
-  const eligibleMembers = channel.members.filter((member) => !member.user.bot);
+  const interactionUserId = interaction.user.id;
+
+  const eligibleMembers = channel.members.filter(
+    (member) => !member.user.bot && member.id !== interactionUserId,
+  );
 
   if (eligibleMembers.size === 0) {
     await interaction.reply({
