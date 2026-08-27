@@ -1021,20 +1021,16 @@ async function handleSoundboardUser(interaction: ButtonInteraction) {
   if (!context) return replyNotInChannel(interaction);
   const { channel } = context;
 
-  const interactionUserId = interaction.user.id;
+  const requester = await interaction
+    .guild!.members.fetch(interaction.user.id)
+    .catch(() => null);
 
-  const candidates = channel.members.filter(
-    (member) => !member.user.bot && member.id !== interactionUserId,
-  );
-
-  const roleEligible = candidates.filter(hasSoundboardRole);
-
-  if (roleEligible.size === 0) {
+  if (!requester || !hasSoundboardRole(requester)) {
     await interaction.reply({
       embeds: [
         buildErrorEmbed(
-          "No Eligible Users",
-          "No one in the channel holds the role required for soundboard access.",
+          "Missing Required Role",
+          "You need one of the designated soundboard-manager roles to grant soundboard access.",
         ),
       ],
       flags: MessageFlags.Ephemeral,
@@ -1042,8 +1038,12 @@ async function handleSoundboardUser(interaction: ButtonInteraction) {
     return;
   }
 
-  const eligibleMembers = roleEligible.filter(
+  const interactionUserId = interaction.user.id;
+
+  const eligibleMembers = channel.members.filter(
     (member) =>
+      !member.user.bot &&
+      member.id !== interactionUserId &&
       !channel.permissionsFor(member).has(PermissionFlagsBits.UseSoundboard),
   );
 
@@ -1052,7 +1052,7 @@ async function handleSoundboardUser(interaction: ButtonInteraction) {
       embeds: [
         buildErrorEmbed(
           "Everyone Already Has Access",
-          "Everyone eligible in this channel already has soundboard access.",
+          "Everyone currently in this channel already has soundboard access.",
         ),
       ],
       flags: MessageFlags.Ephemeral,
@@ -1096,6 +1096,23 @@ async function handleSoundboardUserSelected(
   if (!context) return replyNotInChannel(interaction);
   const { channel } = context;
 
+  const requester = await interaction
+    .guild!.members.fetch(interaction.user.id)
+    .catch(() => null);
+
+  if (!requester || !hasSoundboardRole(requester)) {
+    await interaction.update({
+      embeds: [
+        buildErrorEmbed(
+          "Missing Required Role",
+          "You no longer have one of the designated soundboard-manager roles.",
+        ),
+      ],
+      components: [],
+    });
+    return;
+  }
+
   const targetId = interaction.values[0];
   const member = channel.members.get(targetId);
 
@@ -1108,19 +1125,6 @@ async function handleSoundboardUserSelected(
         ),
       ],
       flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
-
-  if (!hasSoundboardRole(member)) {
-    await interaction.update({
-      embeds: [
-        buildErrorEmbed(
-          "Missing Required Role",
-          `**${stripDisplayNamePrefix(member.displayName)}** no longer has the role required for soundboard access.`,
-        ),
-      ],
-      components: [],
     });
     return;
   }
@@ -1147,6 +1151,23 @@ async function handleSoundboardRemove(interaction: ButtonInteraction) {
   const context = await resolveTempVcContext(interaction);
   if (!context) return replyNotInChannel(interaction);
   const { channel } = context;
+
+  const requester = await interaction
+    .guild!.members.fetch(interaction.user.id)
+    .catch(() => null);
+
+  if (!requester || !hasSoundboardRole(requester)) {
+    await interaction.reply({
+      embeds: [
+        buildErrorEmbed(
+          "Missing Required Role",
+          "You need one of the designated soundboard-manager roles to revoke soundboard access.",
+        ),
+      ],
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
 
   const soundboardOverwrites = channel.permissionOverwrites.cache.filter(
     (overwrite) =>
@@ -1212,6 +1233,23 @@ async function handleSoundboardRemoveSelected(
   const context = await resolveTempVcContext(interaction);
   if (!context) return replyNotInChannel(interaction);
   const { channel } = context;
+
+  const requester = await interaction
+    .guild!.members.fetch(interaction.user.id)
+    .catch(() => null);
+
+  if (!requester || !hasSoundboardRole(requester)) {
+    await interaction.update({
+      embeds: [
+        buildErrorEmbed(
+          "Missing Required Role",
+          "You no longer have one of the designated soundboard-manager roles.",
+        ),
+      ],
+      components: [],
+    });
+    return;
+  }
 
   const targetId = interaction.values[0];
   const overwrite = channel.permissionOverwrites.cache.get(targetId);
