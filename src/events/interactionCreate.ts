@@ -111,6 +111,7 @@ const buttonHandlers: Record<
   vc_unblock: handleUnblockUser,
   vc_claim: handleClaimOwnership,
   vc_transfer: handleTransferOwnership,
+  vc_soundboard: handleSoundboardUser,
 };
 
 // ---------- String select menu handlers (customId -> action) ----------
@@ -124,6 +125,7 @@ const stringSelectMenuHandlers: Record<
   vc_party_select: handlePartySelected,
   vc_transfer_select: handleTransferOwnershipSelected,
   vc_unblock_select: handleUnblockUserSelected,
+  vc_soundboard_select: handleSoundboardUserSelected,
 };
 
 export default {
@@ -1001,6 +1003,96 @@ async function handleTransferOwnershipSelected(
         "👑",
         "Ownership Transferred",
         `Ownership transferred to **${target.user.username}**.`,
+      ),
+    ],
+    components: [],
+  });
+}
+
+// ---------- Soundboard access ----------
+
+async function handleSoundboardUser(interaction: ButtonInteraction) {
+  const context = await resolveTempVcContext(interaction);
+  if (!context) return replyNotInChannel(interaction);
+  const { channel } = context;
+
+  const eligibleMembers = channel.members.filter((member) => !member.user.bot);
+
+  if (eligibleMembers.size === 0) {
+    await interaction.reply({
+      embeds: [
+        buildErrorEmbed(
+          "No One Here!",
+          "There is currently no one in the channel to grant soundboard access to.",
+        ),
+      ],
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  const select = new StringSelectMenuBuilder()
+    .setCustomId("vc_soundboard_select")
+    .setPlaceholder("Choose a user to grant soundboard access")
+    .setMinValues(1)
+    .setMaxValues(1)
+    .addOptions(
+      eligibleMembers.map((member) =>
+        new StringSelectMenuOptionBuilder()
+          .setLabel(stripDisplayNamePrefix(member.displayName))
+          .setDescription(member.user.username)
+          .setValue(member.id),
+      ),
+    );
+
+  await interaction.reply({
+    embeds: [
+      buildActionEmbed(
+        "🔊",
+        "Soundboard Access",
+        "Select a user to give soundboard permissions to in this channel.",
+      ),
+    ],
+    components: [
+      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select),
+    ],
+    flags: MessageFlags.Ephemeral,
+  });
+}
+
+async function handleSoundboardUserSelected(
+  interaction: StringSelectMenuInteraction,
+) {
+  const context = await resolveTempVcContext(interaction);
+  if (!context) return replyNotInChannel(interaction);
+  const { channel } = context;
+
+  const targetId = interaction.values[0];
+  const member = channel.members.get(targetId);
+
+  if (!member) {
+    await interaction.reply({
+      embeds: [
+        buildErrorEmbed(
+          "User Not Found",
+          "That user is no longer in the voice channel.",
+        ),
+      ],
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  await channel.permissionOverwrites.edit(member.id, {
+    UseSoundboard: true,
+  });
+
+  await interaction.update({
+    embeds: [
+      buildActionEmbed(
+        "🔊",
+        "Soundboard Access Granted",
+        `**${stripDisplayNamePrefix(member.displayName)}** can now use the soundboard in this channel.`,
       ),
     ],
     components: [],

@@ -13,6 +13,16 @@ function getEnv(name: string): string {
   return value;
 }
 
+function getEnvArray(name: string): string[] {
+  const value = process.env[name];
+
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+
+  return value.split(",").map((item) => item.trim());
+}
+
 export const config: AppConfig = {
   discordToken: getEnv("DISCORD_TOKEN"),
   discordGuildId: getEnv("DISCORD_GUILD_ID"),
@@ -25,4 +35,5 @@ export const config: AppConfig = {
   discordTempVcChannelId: getEnv("DISCORD_TEMPVC_CHANNEL_ID"),
   discordTempVcModeratorRoleId: getEnv("DISCORD_TEMPVC_MODERATOR_ROLE_ID"),
   discordVerifiedRoleId: getEnv("DISCORD_VERIFIED_ROLE_ID"),
+  discordSoundBoardRolesId: getEnvArray("DISCORD_SOUNDBOARD_ROLES_ID"),
 } as const;

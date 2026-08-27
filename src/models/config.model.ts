@@ -10,4 +10,5 @@ export default interface AppConfig {
   discordTempVcChannelId: string;
   discordTempVcModeratorRoleId: string;
   discordVerifiedRoleId: string;
+  discordSoundBoardRolesId: string[];
 }
