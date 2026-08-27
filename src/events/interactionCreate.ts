@@ -14,6 +14,7 @@ import {
   StringSelectMenuOptionBuilder,
   StringSelectMenuInteraction,
   GuildMember,
+  PermissionFlagsBits,
 } from "discord.js";
 import { Event } from "../models/types/event.js";
 import { config } from "../config.js";
@@ -1019,7 +1020,7 @@ async function handleSoundboardUser(interaction: ButtonInteraction) {
   const interactionUserId = interaction.user.id;
 
   const eligibleMembers = channel.members.filter(
-    (member) => !member.user.bot && member.id !== interactionUserId,
+    (member) => !member.user.bot && member.id !== interactionUserId && !channel.permissionsFor(member).has(PermissionFlagsBits.UseSoundboard),
   );
 
   if (eligibleMembers.size === 0) {
