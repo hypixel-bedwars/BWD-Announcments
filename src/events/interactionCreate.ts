@@ -15,6 +15,7 @@ import {
   StringSelectMenuInteraction,
   GuildMember,
   PermissionFlagsBits,
+  OverwriteType,
 } from "discord.js";
 import { Event } from "../models/types/event.js";
 import { config } from "../config.js";
@@ -23,6 +24,7 @@ import {
   buildActionEmbed,
   buildErrorEmbed,
   resolveTempVcContext,
+  hasSoundboardRole,
 } from "../utils.js";
 import {
   setChannelName,
@@ -113,6 +115,7 @@ const buttonHandlers: Record<
   vc_claim: handleClaimOwnership,
   vc_transfer: handleTransferOwnership,
   vc_soundboard: handleSoundboardUser,
+  vc_soundboard_remove: handleSoundboardRemove,
 };
 
 // ---------- String select menu handlers (customId -> action) ----------
@@ -127,6 +130,7 @@ const stringSelectMenuHandlers: Record<
   vc_transfer_select: handleTransferOwnershipSelected,
   vc_unblock_select: handleUnblockUserSelected,
   vc_soundboard_select: handleSoundboardUserSelected,
+  vc_soundboard_remove_select: handleSoundboardRemoveSelected,
 };
 
 export default {
@@ -1019,16 +1023,36 @@ async function handleSoundboardUser(interaction: ButtonInteraction) {
 
   const interactionUserId = interaction.user.id;
 
-  const eligibleMembers = channel.members.filter(
-    (member) => !member.user.bot && member.id !== interactionUserId && !channel.permissionsFor(member).has(PermissionFlagsBits.UseSoundboard),
+  const candidates = channel.members.filter(
+    (member) => !member.user.bot && member.id !== interactionUserId,
+  );
+
+  const roleEligible = candidates.filter(hasSoundboardRole);
+
+  if (roleEligible.size === 0) {
+    await interaction.reply({
+      embeds: [
+        buildErrorEmbed(
+          "No Eligible Users",
+          "No one in the channel holds the role required for soundboard access.",
+        ),
+      ],
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  const eligibleMembers = roleEligible.filter(
+    (member) =>
+      !channel.permissionsFor(member).has(PermissionFlagsBits.UseSoundboard),
   );
 
   if (eligibleMembers.size === 0) {
     await interaction.reply({
       embeds: [
         buildErrorEmbed(
-          "No One Here!",
-          "There is currently no one in the channel to grant soundboard access to.",
+          "Everyone Already Has Access",
+          "Everyone eligible in this channel already has soundboard access.",
         ),
       ],
       flags: MessageFlags.Ephemeral,
@@ -1088,6 +1112,19 @@ async function handleSoundboardUserSelected(
     return;
   }
 
+  if (!hasSoundboardRole(member)) {
+    await interaction.update({
+      embeds: [
+        buildErrorEmbed(
+          "Missing Required Role",
+          `**${stripDisplayNamePrefix(member.displayName)}** no longer has the role required for soundboard access.`,
+        ),
+      ],
+      components: [],
+    });
+    return;
+  }
+
   await channel.permissionOverwrites.edit(member.id, {
     UseSoundboard: true,
   });
@@ -1098,6 +1135,117 @@ async function handleSoundboardUserSelected(
         "🔊",
         "Soundboard Access Granted",
         `**${stripDisplayNamePrefix(member.displayName)}** can now use the soundboard in this channel.`,
+      ),
+    ],
+    components: [],
+  });
+}
+
+// ---------- Remove soundboard access ----------
+
+async function handleSoundboardRemove(interaction: ButtonInteraction) {
+  const context = await resolveTempVcContext(interaction);
+  if (!context) return replyNotInChannel(interaction);
+  const { channel } = context;
+
+  const soundboardOverwrites = channel.permissionOverwrites.cache.filter(
+    (overwrite) =>
+      overwrite.type === OverwriteType.Member &&
+      overwrite.allow.has(PermissionFlagsBits.UseSoundboard),
+  );
+
+  if (soundboardOverwrites.size === 0) {
+    await interaction.reply({
+      embeds: [
+        buildErrorEmbed(
+          "No One to Remove!",
+          "No one currently has soundboard access granted in this channel.",
+        ),
+      ],
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  const options = await Promise.all(
+    soundboardOverwrites.map(async (overwrite) => {
+      const member = await interaction
+        .guild!.members.fetch(overwrite.id)
+        .catch(() => null);
+      const label = member
+        ? stripDisplayNamePrefix(member.displayName)
+        : `Unknown user (${overwrite.id})`;
+      const description = member ? member.user.username : "No longer in server";
+
+      return new StringSelectMenuOptionBuilder()
+        .setLabel(label.slice(0, 100))
+        .setDescription(description.slice(0, 100))
+        .setValue(overwrite.id);
+    }),
+  );
+
+  const select = new StringSelectMenuBuilder()
+    .setCustomId("vc_soundboard_remove_select")
+    .setPlaceholder("Choose a user to remove soundboard access from")
+    .setMinValues(1)
+    .setMaxValues(1)
+    .addOptions(options);
+
+  await interaction.reply({
+    embeds: [
+      buildActionEmbed(
+        "🔇",
+        "Remove Soundboard Access",
+        "Select a user to revoke soundboard permissions from.",
+      ),
+    ],
+    components: [
+      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select),
+    ],
+    flags: MessageFlags.Ephemeral,
+  });
+}
+
+async function handleSoundboardRemoveSelected(
+  interaction: StringSelectMenuInteraction,
+) {
+  const context = await resolveTempVcContext(interaction);
+  if (!context) return replyNotInChannel(interaction);
+  const { channel } = context;
+
+  const targetId = interaction.values[0];
+  const overwrite = channel.permissionOverwrites.cache.get(targetId);
+
+  if (!overwrite || !overwrite.allow.has(PermissionFlagsBits.UseSoundboard)) {
+    await interaction.update({
+      embeds: [
+        buildErrorEmbed(
+          "Already Removed",
+          "That user no longer has soundboard access.",
+        ),
+      ],
+      components: [],
+    });
+    return;
+  }
+
+  await channel.permissionOverwrites.edit(targetId, {
+    UseSoundboard: null,
+  });
+
+  const member = await interaction
+    .guild!.members.fetch(targetId)
+    .catch(() => null);
+  const name = member
+    ? stripDisplayNamePrefix(member.displayName)
+    : "that user";
+
+  await interaction.update({
+    embeds: [
+      buildActionEmbed(
+        "🔇",
+        "Soundboard Access Removed",
+        `**${name}**'s soundboard access has been revoked.`,
       ),
     ],
     components: [],

@@ -4,6 +4,7 @@ import {
   ButtonInteraction,
   ButtonStyle,
   EmbedBuilder,
+  GuildMember,
   ModalSubmitInteraction,
   StringSelectMenuInteraction,
   VoiceChannel,
@@ -12,6 +13,7 @@ import {
   getTempVcChannel,
   TempVcChannel,
 } from "./database/repository/temp_channels.js";
+import { config } from "./config.js";
 
 const EMBED_FOOTER = "Hypixel Bedwars • Enhanced for performance 🚀";
 const COLOR_SUCCESS = 0x57f287;
@@ -87,6 +89,11 @@ export function buildChannelManagementMessage(ownerRoleId: string) {
       .setLabel("SoundBoard Access")
       .setEmoji("🔊")
       .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId("vc_soundboard_remove")
+      .setLabel("Revoke Soundboard")
+      .setEmoji("🔇")
+      .setStyle(ButtonStyle.Danger),
   );
 
   // Row 3 — ownership
@@ -159,4 +166,10 @@ export async function resolveTempVcContext(
   if (!channel || !channel.isVoiceBased()) return null;
 
   return { tempVc, channel: channel as VoiceChannel };
+}
+
+export function hasSoundboardRole(member: GuildMember): boolean {
+  return config.discordSoundBoardRolesId.some((roleId) =>
+    member.roles.cache.has(roleId),
+  );
 }
