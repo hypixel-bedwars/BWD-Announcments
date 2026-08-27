@@ -1230,7 +1230,7 @@ async function handleSoundboardRemoveSelected(
   }
 
   await channel.permissionOverwrites.edit(targetId, {
-    UseSoundboard: null,
+    UseSoundboard: false,
   });
 
   const member = await interaction
