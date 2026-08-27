@@ -1172,6 +1172,7 @@ async function handleSoundboardRemove(interaction: ButtonInteraction) {
   const soundboardOverwrites = channel.permissionOverwrites.cache.filter(
     (overwrite) =>
       overwrite.type === OverwriteType.Member &&
+      overwrite.id !== interaction.user.id &&
       overwrite.allow.has(PermissionFlagsBits.UseSoundboard),
   );
 
