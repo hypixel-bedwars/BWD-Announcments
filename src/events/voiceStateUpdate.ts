@@ -4,12 +4,14 @@ import { config } from "../config.js";
 import {
   createTempVcChannel,
   deleteTempVcChannel,
+  getTempVcChannel,
   tempVcChannelExists,
 } from "../database/repository/temp_channels.js";
 import {
   buildChannelManagementMessage,
   stripDisplayNamePrefix,
 } from "../utils.js";
+import { recordChannelClosed } from "../database/repository/temp_channel_stats.js";
 
 export default {
   name: Events.VoiceStateUpdate,
@@ -72,13 +74,19 @@ export default {
     // tracked temp VC and is now empty
     if (oldChannel && oldChannel !== newChannel) {
       const leftChannel = oldState.channel;
-
       if (leftChannel && tempVcChannelExists(oldChannel)) {
         if (leftChannel.members.size === 0) {
+          const tempChannel = getTempVcChannel(oldChannel); // grab created_at first
+
           await leftChannel.delete().catch(() => {
             // Channel may have already been deleted (race condition)
           });
+
+          if (tempChannel) {
+            recordChannelClosed(oldChannel, tempChannel.created_at);
+          }
           deleteTempVcChannel(oldChannel);
+
           console.log(
             `Deleted empty temp VC: ${leftChannel.name} (${oldChannel})`,
           );

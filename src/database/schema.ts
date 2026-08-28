@@ -20,7 +20,26 @@ export function initializeDatabase() {
         FOREIGN KEY (channel_id) REFERENCES temp_channels(channel_id) ON DELETE CASCADE
     );
 
+    -- Temp Statistics table: one row per closed channel
+    CREATE TABLE IF NOT EXISTS temp_channel_events (
+        total_time  INTEGER NOT NULL CHECK (total_time >= 0),
+        channel_id  TEXT NOT NULL,
+        closed_at   INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+
+    -- Daily snapshots of the statistics
+    CREATE TABLE IF NOT EXISTS temp_channel_daily_statistics (
+        date            TEXT PRIMARY KEY,
+        total_channels  INTEGER NOT NULL DEFAULT 0,
+        total_time      INTEGER NOT NULL DEFAULT 0
+    );
+
     -- Helpful index for looking up all channels owned by a user
     CREATE INDEX IF NOT EXISTS idx_temp_channels_owner ON temp_channels(owner_id);
+    -- banned_users
+    CREATE INDEX IF NOT EXISTS idx_banned_users_user ON banned_users(user_id);
+    -- temp_channel_events: speeds up range scans when building daily rollups
+    CREATE INDEX IF NOT EXISTS idx_temp_channel_events_closed_at ON temp_channel_events(closed_at);
+    CREATE INDEX IF NOT EXISTS idx_temp_channel_events_channel_id ON temp_channel_events(channel_id);
   `);
 }
