@@ -93,12 +93,6 @@ export default {
     // Left a channel (disconnected, or moved elsewhere) then check if it was a
     // tracked temp VC and is now empty
     if (oldChannel && oldChannel !== newChannel) {
-<<<<<<< Updated upstream
-      const leftChannel = oldState.channel;
-
-      if (leftChannel && tempVcChannelExists(oldChannel)) {
-        if (leftChannel.members.size === 0) {
-=======
       const leftChannel = oldState.guild.channels.cache.get(oldChannel);
       if (
         leftChannel &&
@@ -109,9 +103,6 @@ export default {
           (m) => !m.user.bot,
         ).size;
         if (humanMembers === 0) {
-          const tempChannel = getTempVcChannel(oldChannel); 
-
->>>>>>> Stashed changes
           await leftChannel.delete().catch(() => {
             // Channel may have already been deleted (race condition)
           });
